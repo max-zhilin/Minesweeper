@@ -1,19 +1,37 @@
 package minesweeper
 
-const val rows = 8
-const val columns = 10
+import kotlin.random.Random
+
+const val rows = 9
+const val columns = 9
 
 fun main() {
     val field = arrayOf(
-            "..X.......",
-            ".........X",
-            "X.........",
-            "..........",
-            "..X....X..",
-            "..........",
-            ".....X....",
-            ".....X....",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
     )
+
+    print("How many mines do you want on the field? ")
+    val mines = readLine()!!.toInt()
+
+    var i = mines
+    while (i > 0) {
+        val row = Random.nextInt(rows)
+        val column = Random.nextInt(columns)
+        if (field[row][column] == '.') {
+            val chars = field[row].toCharArray()
+            chars[column] = 'X'
+            field[row] = String(chars)
+            i--
+        }
+    }
 
     for (i in field) {
         println(i)
