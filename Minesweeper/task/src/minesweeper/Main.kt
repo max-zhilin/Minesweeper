@@ -1,5 +1,6 @@
 package minesweeper
 
+import com.sun.org.apache.xpath.internal.operations.Bool
 import kotlin.random.Random
 
 fun main() {
@@ -7,54 +8,79 @@ fun main() {
     Game.start()
 
     while (!Game.won()) {
-        Game.move()
+        val blown = Game.move()
+        if (blown) {
+            Game.lose()
+            return
+        }
     }
 
     Game.congratulations()
-
 }
 
 object Game {
 
     val scanner = java.util.Scanner(System.`in`)
     val board = Board(9, 9)
+    var firstExplored = true
 
     fun start() {
         print("How many mines do you want on the field? ")
         val numberOfMines = scanner.nextInt()
         board.placeMines(numberOfMines)
-        board.calcNumbers()
+        board.calcNumbers() // also recalc at first explore
         board.show()
     }
 
     fun won(): Boolean {
 
+        var allMinesMarked = true
+        var allEmptyOpen = true
+
         for (i in 0 until board.rows)
             for (j in 0 until board.columns) {
                 if (board.mines[i][j] && !board.marks[i][j] ||
                         board.marks[i][j] && !board.mines[i][j]) {
-                    return false
+                    allMinesMarked = false
+                }
+                if (!board.open[i][j] && !board.mines[i][j]) {
+                    allEmptyOpen = false
                 }
             }
 
-        return true
+        return allMinesMarked || allEmptyOpen
     }
 
-    fun move() {
-        var goodCoordinates = false
-        do {
-            print("Set/delete mine marks (x and y coordinates): ")
-            val column = scanner.nextInt() - 1
-            val row = scanner.nextInt() - 1
+    fun move(): Boolean {
 
-            if (board.field[row][column].isDigit()) {
-                 println("There is a number here!")
-            } else {
-                board.marks[row][column] = !board.marks[row][column]
-                goodCoordinates = true
+        print("Set/unset mine marks or claim a cell as free: ")
+
+        val column = scanner.nextInt() - 1
+        val row = scanner.nextInt() - 1
+        val command = scanner.next()
+
+        when (command) {
+            "free" -> {
+                if (firstExplored && board.mines[row][column]) {
+                    board.placeMines(1)
+                    board.mines[row][column] = false
+                    board.calcNumbers() // need to recalc
+                    board.openRecursively(row, column)
+                } else if (board.mines[row][column]) return true
+                else board.openRecursively(row, column)
+                firstExplored = false
             }
-        } while (!goodCoordinates)
+            "mine" -> if (!board.open[row][column]) board.marks[row][column] = !board.marks[row][column]
+        }
+
         board.show()
+
+        return false
+    }
+
+    fun lose() {
+        board.show(true)
+        println("You stepped on a mine and failed!")
     }
 
     fun congratulations() {
@@ -64,9 +90,10 @@ object Game {
 
 class Board(val rows: Int, val columns: Int) {
 
-    val field = Array(rows) {CharArray(columns) {'.'} }
+    val numbers = Array(rows) {IntArray(columns) {0} }
     val mines = Array(rows) {BooleanArray(columns) {false} }
     val marks = Array(rows) {BooleanArray(columns) {false} }
+    val open = Array(rows) {BooleanArray(columns) {false} }
 
     fun placeMines(numberOfMines: Int) {
         var i = numberOfMines
@@ -98,27 +125,48 @@ class Board(val rows: Int, val columns: Int) {
                 if (i < rows - 1 && j > 0 && mines[i + 1][j - 1]) sum++
                 if (i < rows - 1 && j < columns - 1 && mines[i + 1][j + 1]) sum++
 
-                if (sum > 0) {
-                    field[i][j] = sum.toChar() + '0'.toInt()
-                }
+                numbers[i][j] = sum
             }
     }
 
-    fun show() {
+    fun show(withMines: Boolean = false) {
         println(" │123456789│")
         println("—│—————————│")
-        for (i in field.indices) {
+        for (i in 0 until rows) {
             print(i + 1)
             print("|")
-            for (j in field[i].indices) {
-                if (marks[i][j]) {
-                    print('*')
-                } else {
-                    print(field[i][j])
+            for (j in 0 until columns) {
+                when {
+                    withMines && mines[i][j] -> print('X')
+                    marks[i][j] -> print('*')
+                    !open[i][j] -> print('.')
+                    numbers[i][j] == 0 -> print('/')
+                    else -> print(numbers[i][j])
                 }
             }
             println("│")
         }
         println("—│—————————│")
+    }
+
+    fun openRecursively(row: Int, column: Int) {
+        if (row in 0 until rows && column in 0 until columns) {
+            if (open[row][column]) return
+            else {
+                open[row][column] = true
+                marks[row][column] = false
+            }
+
+            if (numbers[row][column] == 0) {
+                openRecursively(row - 1, column - 1)
+                openRecursively(row - 1, column)
+                openRecursively(row - 1, column + 1)
+                openRecursively(row, column - 1)
+                openRecursively(row, column + 1)
+                openRecursively(row + 1, column - 1)
+                openRecursively(row + 1, column)
+                openRecursively(row + 1, column + 1)
+            }
+        }
     }
 }
